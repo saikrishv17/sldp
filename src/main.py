@@ -7,9 +7,14 @@ mp_draw = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
 
+prev_x = None
+threshold = 0.07
+
+gesture_text = ""
+direction = ""
+
 while True:
     ret, frame = cap.read()
-
     if not ret:
         break
 
@@ -18,42 +23,53 @@ while True:
 
     results = hands.process(rgb)
 
+    direction = ""
+    gesture_text = ""
+
     if results.multi_hand_landmarks:
         for hand_landmarks in results.multi_hand_landmarks:
 
-            # Draw hand
             mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
-            # Get landmarks
             lm = hand_landmarks.landmark
 
             fingers = []
 
-            # Index
             fingers.append(1 if lm[8].y < lm[6].y else 0)
-
-            # Middle
             fingers.append(1 if lm[12].y < lm[10].y else 0)
-
-            # Ring
             fingers.append(1 if lm[16].y < lm[14].y else 0)
-
-            # Pinky
             fingers.append(1 if lm[20].y < lm[18].y else 0)
 
             total = sum(fingers)
 
             if total >= 3:
-                text = "OPEN"
+                gesture_text = "OPEN"
             else:
-                text = "FIST"
+                gesture_text = "FIST"
 
-            # Display result
-            cv2.putText(frame, text, (50, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 2,
-                        (0, 255, 0), 3)
+            current_x = lm[8].x
 
-    cv2.imshow("Hand Tracking", frame)
+            if gesture_text == "OPEN" and prev_x is not None:
+                diff = current_x - prev_x
+
+                if diff > threshold:
+                    direction = "RIGHT"
+                elif diff < -threshold:
+                    direction = "LEFT"
+
+            prev_x = current_x
+
+    display_text = gesture_text
+
+    if direction:
+        display_text = direction
+
+    if display_text:
+        cv2.putText(frame, display_text, (50, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 2,
+                    (0, 255, 0), 3)
+
+    cv2.imshow("Gesture System", frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
