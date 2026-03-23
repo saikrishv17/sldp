@@ -1,5 +1,7 @@
 import cv2
 import mediapipe as mp
+import time
+from spotify_control import play, pause, next_song, prev_song
 
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands()
@@ -8,10 +10,11 @@ mp_draw = mp.solutions.drawing_utils
 cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
 
 prev_x = None
-threshold = 0.07
+threshold = 0.05
 
-gesture_text = ""
-direction = ""
+prev_gesture = ""
+last_action_time = 0
+cooldown = 1.0
 
 while True:
     ret, frame = cap.read()
@@ -34,7 +37,6 @@ while True:
             lm = hand_landmarks.landmark
 
             fingers = []
-
             fingers.append(1 if lm[8].y < lm[6].y else 0)
             fingers.append(1 if lm[12].y < lm[10].y else 0)
             fingers.append(1 if lm[16].y < lm[14].y else 0)
@@ -59,17 +61,41 @@ while True:
 
             prev_x = current_x
 
-    display_text = gesture_text
+    current_time = time.time()
+    action = ""
 
-    if direction:
-        display_text = direction
+    if (current_time - last_action_time) > cooldown:
+
+        if prev_gesture == "OPEN" and gesture_text == "FIST":
+            action = "PAUSE"
+            pause()
+            last_action_time = current_time
+
+        elif prev_gesture == "FIST" and gesture_text == "OPEN":
+            action = "PLAY"
+            play()
+            last_action_time = current_time
+
+        elif direction == "RIGHT":
+            action = "NEXT"
+            next_song()
+            last_action_time = current_time
+
+        elif direction == "LEFT":
+            action = "PREVIOUS"
+            prev_song()
+            last_action_time = current_time
+
+    display_text = action if action else gesture_text
 
     if display_text:
         cv2.putText(frame, display_text, (50, 100),
                     cv2.FONT_HERSHEY_SIMPLEX, 2,
                     (0, 255, 0), 3)
 
-    cv2.imshow("Gesture System", frame)
+    prev_gesture = gesture_text
+
+    cv2.imshow("Gesture Spotify Control", frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
